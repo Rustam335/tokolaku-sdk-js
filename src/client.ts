@@ -1,5 +1,6 @@
 // src/client.ts
 import { mapResponseError, TokolakuAPIError, TokolakuValidationError } from "./errors.js";
+import { shouldRetry, retryDelayMs, type RetryPolicy } from "./retry.js";
 import type {
   BotReplyParams, BotReplyResponse, SendMessageParams, SendMessageResponse, TokolakuOptions,
 } from "./types.js";
@@ -7,8 +8,6 @@ import type {
 const DEFAULT_BASE_URL = "https://api.tokolaku.id";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RETRIES = 2;
-
-type RetryPolicy = "botReply" | "messages";
 
 export class Tokolaku {
   readonly #apiKey: string;
@@ -50,21 +49,40 @@ export class Tokolaku {
     },
   };
 
-  async #request<T>(path: string, body: unknown, _policy: RetryPolicy): Promise<T> {
+  async #request<T>(path: string, body: unknown, policy: RetryPolicy): Promise<T> {
+    let lastError: TokolakuAPIError | null = null;
+    for (let attempt = 0; attempt <= this.#maxRetries; attempt++) {
+      let retryAfterSec: number | null = null;
+      try {
+        return await this.#once<T>(path, body, (v) => { retryAfterSec = v; });
+      } catch (e) {
+        const err = e instanceof TokolakuAPIError
+          ? e
+          : new TokolakuAPIError(String(e), { status: null, code: "network_error" });
+        lastError = err;
+        if (attempt >= this.#maxRetries || !shouldRetry(policy, err)) throw err;
+        await new Promise((r) => setTimeout(r, retryDelayMs(attempt, retryAfterSec)));
+      }
+    }
+    throw lastError!;
+  }
+
+  async #once<T>(path: string, body: unknown, onRetryAfter: (sec: number | null) => void): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.#timeoutMs);
     try {
       const res = await this.#fetch(`${this.#baseUrl}${path}`, {
         method: "POST",
-        headers: {
-          "authorization": `Bearer ${this.#apiKey}`,
-          "content-type": "application/json",
-        },
+        headers: { "authorization": `Bearer ${this.#apiKey}`, "content-type": "application/json" },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
       const text = await res.text();
-      if (!res.ok) throw mapResponseError(res.status, text);
+      if (!res.ok) {
+        const ra = res.headers.get("retry-after");
+        onRetryAfter(ra != null && /^\d+$/.test(ra) ? Number(ra) : null);
+        throw mapResponseError(res.status, text);
+      }
       return JSON.parse(text) as T;
     } catch (e) {
       if (e instanceof TokolakuAPIError) throw e;
