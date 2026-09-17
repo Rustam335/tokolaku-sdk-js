@@ -40,3 +40,11 @@ test("constructEvent: signature valid tapi body bukan JSON -> SyntaxError (bukan
   const raw = "bukan json";
   assert.throws(() => constructEvent(raw, sign(SECRET, raw), SECRET), SyntaxError);
 });
+
+test("subpath webhooks re-export TokolakuWebhookSignatureError (kontrak contoh README)", async () => {
+  // Verifikasi bahwa consumer bisa import class error dari subpath yang sama
+  // dengan fungsi yang melemparnya — sesuai contoh README (konstruksi ESM).
+  const mod = await import("../src/webhooks.ts");
+  assert.equal(typeof mod.TokolakuWebhookSignatureError, "function");
+  assert.ok(new mod.TokolakuWebhookSignatureError() instanceof Error);
+});

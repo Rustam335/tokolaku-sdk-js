@@ -31,3 +31,7 @@ export function constructEvent<T = unknown>(
   }
   return { event: JSON.parse(rawBody) as T };
 }
+
+// Re-export supaya konsumen bisa import class error dari subpath yang sama
+// dengan fungsi yang melemparnya (sesuai contoh README).
+export { TokolakuWebhookSignatureError } from "./errors.js";
