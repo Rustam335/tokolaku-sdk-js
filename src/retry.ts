@@ -18,9 +18,16 @@ export function shouldRetry(policy: RetryPolicy, error: TokolakuAPIError): boole
   return false;
 }
 
-/** Exponential backoff + full jitter, base 250ms cap 1s; Retry-After menang. */
+/** Cap Retry-After: server (atau proxy nakal) yang mengirim nilai raksasa
+ *  (mis. 86400) tidak boleh membuat klien tidur berjam-jam. */
+export const RETRY_AFTER_CAP_SEC = 30;
+
+/** Exponential backoff + full jitter, base 250ms cap 1s; Retry-After menang
+ *  (di-cap RETRY_AFTER_CAP_SEC). */
 export function retryDelayMs(attempt: number, retryAfterSec: number | null): number {
-  if (retryAfterSec != null && Number.isFinite(retryAfterSec)) return Math.max(0, retryAfterSec * 1000);
+  if (retryAfterSec != null && Number.isFinite(retryAfterSec)) {
+    return Math.max(0, Math.min(retryAfterSec, RETRY_AFTER_CAP_SEC) * 1000);
+  }
   const cap = Math.min(1000, 250 * 2 ** attempt);
   return Math.round(cap * (0.5 + Math.random() * 0.5));
 }

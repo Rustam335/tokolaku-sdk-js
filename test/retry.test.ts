@@ -130,3 +130,11 @@ test("Retry-After dihormati oleh retryDelayMs", () => {
   const d = retryDelayMs(1, null);
   assert.ok(d >= 250 && d <= 1000, `delay ${d} di luar [250,1000]`);
 });
+
+test("Retry-After raksasa di-cap RETRY_AFTER_CAP_SEC (30s)", () => {
+  assert.equal(retryDelayMs(0, 86400), 30_000);
+  assert.equal(retryDelayMs(0, 31), 30_000);
+  assert.equal(retryDelayMs(0, 30), 30_000);
+  assert.equal(retryDelayMs(0, 29), 29_000);
+  assert.equal(retryDelayMs(0, -5), 0);
+});
