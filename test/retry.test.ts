@@ -4,7 +4,7 @@ import { Tokolaku } from "../src/client.ts";
 import { TokolakuAPIError, TokolakuRateLimitError } from "../src/errors.ts";
 import { retryDelayMs } from "../src/retry.ts";
 
-function seqFetch(seq: Array<{ status: number; body: unknown; headers?: Record<string, string> } | "network" | "abort">) {
+function seqFetch(seq: Array<{ status: number; body: unknown; headers?: Record<string, string> } | { status: number; raw: string; headers?: Record<string, string> } | "network" | "abort">) {
   let i = 0;
   const impl = (async (_url: any, init: any) => {
     const step = seq[Math.min(i++, seq.length - 1)]!;
@@ -12,10 +12,15 @@ function seqFetch(seq: Array<{ status: number; body: unknown; headers?: Record<s
     if (step === "abort") {
       const e = new Error("aborted"); e.name = "AbortError"; throw e;
     }
+    if ("raw" in step) {
+      return new Response(step.raw, { status: step.status, headers: step.headers });
+    }
     return new Response(JSON.stringify(step.body), { status: step.status, headers: step.headers });
   }) as typeof fetch;
   return { impl, count: () => i };
 }
+
+const MALFORMED_JSON = { status: 200, raw: "{not valid json" };
 
 const OK_REPLY = { status: 200, body: { reply: "ok", parts: ["ok"] } };
 const OK_MSG = { status: 200, body: { id: "m", channel_id: "c", to: "628", type: "text", status: "sent", provider_message_id: null, charged_idr: 0 } };
@@ -66,6 +71,26 @@ test("timeout (AbortError) TIDAK di-retry di kedua endpoint; code='timeout'", as
   const b = seqFetch(["abort", OK_MSG]);
   const tk2 = new Tokolaku({ apiKey: "k", fetchImpl: b.impl, maxRetries: 2 });
   await assert.rejects(() => tk2.messages.send({ to: "628", text: "x" }), (e: TokolakuAPIError) => e.code === "timeout");
+  assert.equal(b.count(), 1);
+});
+
+test("body 200 tapi JSON rusak: TIDAK di-retry (messages & botReply), code='invalid_response'", async () => {
+  // messages.send: 1 panggilan saja, throw TokolakuAPIError code invalid_response status 200
+  const a = seqFetch([MALFORMED_JSON, OK_MSG]);
+  const tk1 = new Tokolaku({ apiKey: "k", fetchImpl: a.impl, maxRetries: 2 });
+  await assert.rejects(
+    () => tk1.messages.send({ to: "628", text: "hai" }),
+    (e: TokolakuAPIError) => e.code === "invalid_response" && e.status === 200,
+  );
+  assert.equal(a.count(), 1);
+
+  // botReply: sama — retry invalid_response juga membakar kuota, non-retryable untuk keduanya
+  const b = seqFetch([MALFORMED_JSON, OK_REPLY]);
+  const tk2 = new Tokolaku({ apiKey: "k", fetchImpl: b.impl, maxRetries: 2 });
+  await assert.rejects(
+    () => tk2.botReply({ message: "hai" }),
+    (e: TokolakuAPIError) => e.code === "invalid_response" && e.status === 200,
+  );
   assert.equal(b.count(), 1);
 });
 

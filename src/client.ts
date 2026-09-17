@@ -56,6 +56,7 @@ export class Tokolaku {
       try {
         return await this.#once<T>(path, body, (v) => { retryAfterSec = v; });
       } catch (e) {
+        // defensif: #once selalu melempar TokolakuAPIError; cabang else = jaring pengaman
         const err = e instanceof TokolakuAPIError
           ? e
           : new TokolakuAPIError(String(e), { status: null, code: "network_error" });
@@ -83,7 +84,13 @@ export class Tokolaku {
         onRetryAfter(ra != null && /^\d+$/.test(ra) ? Number(ra) : null);
         throw mapResponseError(res.status, text);
       }
-      return JSON.parse(text) as T;
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        // Respons HTTP sudah diterima (efek samping server, mis. pesan terkirim &
+        // tercharge, SUDAH terjadi) — parse gagal BUKAN network error & TIDAK boleh di-retry.
+        throw new TokolakuAPIError("Respons server bukan JSON valid", { status: res.status, code: "invalid_response" });
+      }
     } catch (e) {
       if (e instanceof TokolakuAPIError) throw e;
       if (e instanceof Error && e.name === "AbortError") {
