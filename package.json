@@ -1,0 +1,32 @@
+{
+  "name": "tokolaku-sdk",
+  "version": "1.0.0",
+  "description": "Official TypeScript SDK for the Tokolaku Engine API — AI bot replies, omnichannel messaging (WhatsApp/Instagram/Messenger), and webhook verification.",
+  "keywords": ["tokolaku", "whatsapp", "chatbot", "sdk", "api", "messaging"],
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./webhooks": { "types": "./dist/webhooks.d.ts", "import": "./dist/webhooks.js", "require": "./dist/webhooks.cjs" }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "engines": { "node": ">=18" },
+  "repository": { "type": "git", "url": "git+https://github.com/Rustam335/tokolaku-sdk-js.git" },
+  "homepage": "https://tokolaku.id/developers",
+  "scripts": {
+    "build": "tsup",
+    "test": "node --test --import tsx \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "yarn typecheck && yarn test && yarn build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
