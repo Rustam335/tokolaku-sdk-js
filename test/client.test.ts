@@ -32,6 +32,7 @@ test("messages.send text: type diinferensi 'text'", async () => {
   const tk = new Tokolaku({ apiKey: "k", fetchImpl: impl });
   const res = await tk.messages.send({ to: "628", text: "hai" });
   assert.equal(res.status, "sent");
+  assert.equal(calls[0]!.url, "https://api.tokolaku.id/api/v1/messages");
   assert.deepEqual(JSON.parse(String(calls[0]!.init.body)), { to: "628", type: "text", text: "hai" });
 });
 

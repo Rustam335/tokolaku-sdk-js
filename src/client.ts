@@ -78,7 +78,19 @@ export class Tokolaku {
         body: JSON.stringify(body),
         signal: controller.signal,
       });
-      const text = await res.text();
+      let text: string;
+      try {
+        text = await res.text();
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") {
+          throw new TokolakuAPIError(`Timeout setelah ${this.#timeoutMs}ms`, { status: null, code: "timeout" });
+        }
+        // Header respons SUDAH diterima (request sampai server, efek samping —
+        // mis. pesan terkirim & tercharge, reply AI dihasilkan — mungkin sudah
+        // terjadi) tapi koneksi putus saat membaca body. BUKAN network error &
+        // TIDAK boleh di-retry (lihat shouldRetry: sejajar dengan invalid_response).
+        throw new TokolakuAPIError("Gagal membaca body respons", { status: res.status, code: "response_read_error" });
+      }
       if (!res.ok) {
         const ra = res.headers.get("retry-after");
         onRetryAfter(ra != null && /^\d+$/.test(ra) ? Number(ra) : null);

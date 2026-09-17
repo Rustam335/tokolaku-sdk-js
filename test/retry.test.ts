@@ -94,6 +94,37 @@ test("body 200 tapi JSON rusak: TIDAK di-retry (messages & botReply), code='inva
   assert.equal(b.count(), 1);
 });
 
+test("body-read gagal pasca-header (koneksi putus): TIDAK di-retry (messages & botReply), code='response_read_error'", async () => {
+  const erroringBodyFetch = (async () => {
+    return new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.error(new Error("boom"));
+        },
+      }),
+      { status: 200 },
+    );
+  }) as typeof fetch;
+
+  let calls1 = 0;
+  const impl1 = (async (...args: Parameters<typeof fetch>) => { calls1++; return erroringBodyFetch(...args); }) as typeof fetch;
+  const tk1 = new Tokolaku({ apiKey: "k", fetchImpl: impl1, maxRetries: 2 });
+  await assert.rejects(
+    () => tk1.messages.send({ to: "628", text: "hai" }),
+    (e: TokolakuAPIError) => e.code === "response_read_error" && e.status === 200,
+  );
+  assert.equal(calls1, 1);
+
+  let calls2 = 0;
+  const impl2 = (async (...args: Parameters<typeof fetch>) => { calls2++; return erroringBodyFetch(...args); }) as typeof fetch;
+  const tk2 = new Tokolaku({ apiKey: "k", fetchImpl: impl2, maxRetries: 2 });
+  await assert.rejects(
+    () => tk2.botReply({ message: "hai" }),
+    (e: TokolakuAPIError) => e.code === "response_read_error" && e.status === 200,
+  );
+  assert.equal(calls2, 1);
+});
+
 test("Retry-After dihormati oleh retryDelayMs", () => {
   assert.equal(retryDelayMs(0, 3), 3000);
   const d = retryDelayMs(1, null);

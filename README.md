@@ -90,11 +90,13 @@ The SDK retries automatically (`maxRetries`, default `2`) using exponential back
 | `5xx` server error | Retried | **Not** retried |
 | Timeout (`code: "timeout"`) | **Not** retried | **Not** retried |
 | `2xx` with malformed JSON body (`code: "invalid_response"`) | **Not** retried | **Not** retried |
+| `2xx` where the body stream fails mid-read (`code: "response_read_error"`) | **Not** retried | **Not** retried |
 
 - `botReply` has no side effect if it fails, so it retries on `429`, any `5xx`, and network errors.
-- **`messages.send` TIDAK di-retry pada timeout/5xx karena pesan mungkin sudah terkirim** — the message may already have been sent and charged even though the client never saw a successful response, and the API does not yet expose an idempotency key. It only retries on `429` and network errors (no HTTP response was ever received, so nothing could have been sent).
+- **`messages.send` TIDAK di-retry pada timeout/5xx karena pesan mungkin sudah terkirim** — the message may already have been sent and charged even though the client never saw a successful response, and the API does not yet expose an idempotency key. It only retries on `429` and network errors — a network retry only applies when `fetch` itself rejected before any response headers arrived (no response headers were ever received, so nothing could have been sent). Once response headers have arrived, a failure reading the body is a `response_read_error`, not a network error, and is never retried.
 - A timeout (`code: "timeout"`) is never retried on either endpoint, since it's ambiguous whether the server received/processed the request.
-- A `2xx` response with a body that fails to parse as JSON (`code: "invalid_response"`, `status: 200`) is never retried on either endpoint — the request already reached the server and had its side effect (reply generated / message sent and charged); retrying would risk a double-send or burning AI quota for nothing.
+- A `2xx` response with a body that fails to parse as JSON (`code: "invalid_response"`) carries the actual 2xx status the server returned (usually `200`) and is never retried on either endpoint — the request already reached the server and had its side effect (reply generated / message sent and charged); retrying would risk a double-send or burning AI quota for nothing.
+- A `2xx` response whose body stream errors mid-read (`code: "response_read_error"`, e.g. the connection resets after headers arrive) is likewise never retried, for the same reason: response headers arriving means the request already reached the server and may have had its side effect, even though the body was never fully read.
 
 ## Webhooks
 

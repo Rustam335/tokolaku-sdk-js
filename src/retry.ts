@@ -10,7 +10,8 @@ export type RetryPolicy = "botReply" | "messages";
 export function shouldRetry(policy: RetryPolicy, error: TokolakuAPIError): boolean {
   if (error.code === "timeout") return false;
   if (error.status === 429) return true;
-  // "invalid_response" (200 OK tapi body JSON rusak) SENGAJA tidak match rule apa pun di
+  // "invalid_response" (200 OK tapi body JSON rusak) dan "response_read_error" (header
+  // respons sudah diterima tapi baca body gagal) SENGAJA tidak match rule apa pun di
   // bawah ini — efek samping server sudah terjadi, jadi non-retryable untuk kedua policy.
   if (error.code === "network_error") return true;
   if (policy === "botReply" && error.status !== null && error.status >= 500) return true;

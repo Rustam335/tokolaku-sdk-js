@@ -1,6 +1,6 @@
 {
   "name": "tokolaku-sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Official TypeScript SDK for the Tokolaku Engine API — AI bot replies, omnichannel messaging (WhatsApp/Instagram/Messenger), and webhook verification.",
   "keywords": ["tokolaku", "whatsapp", "chatbot", "sdk", "api", "messaging"],
   "license": "MIT",
