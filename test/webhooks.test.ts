@@ -26,3 +26,17 @@ test("constructEvent: valid -> parse; invalid -> TokolakuWebhookSignatureError",
   assert.throws(() => constructEvent(BODY, "sha256=deadbeef", SECRET), TokolakuWebhookSignatureError);
   assert.throws(() => constructEvent(BODY, undefined, SECRET), TokolakuWebhookSignatureError);
 });
+
+test("verify: hex valid + trailing garbage -> false (strict format)", () => {
+  assert.equal(verifyWebhookSignature(BODY, sign(SECRET, BODY) + "zz", SECRET), false);
+});
+
+test("verify: hex uppercase tetap diterima", () => {
+  const upper = "sha256=" + sign(SECRET, BODY).slice(7).toUpperCase();
+  assert.equal(verifyWebhookSignature(BODY, upper, SECRET), true);
+});
+
+test("constructEvent: signature valid tapi body bukan JSON -> SyntaxError (bukan TokolakuWebhookSignatureError)", () => {
+  const raw = "bukan json";
+  assert.throws(() => constructEvent(raw, sign(SECRET, raw), SECRET), SyntaxError);
+});
